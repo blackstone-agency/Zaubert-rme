@@ -362,14 +362,14 @@ const LAYOUTS=[
 const TWISTS=[['','',''],['gold','Goldrausch','3 Goldkarten'],['x2','Schatzkarten','4 Karten zählen doppelt'],['heart','Herzrunde','Alle ♥ zählen doppelt'],['open','Offene Ablage','Zweite Ablage von Anfang an offen']];
 /* Kombo-Leiste: 1. Ablage nach 3 Karten am Stück, 2. Ablage nach 4 weiteren, danach alle 5 ein Bonus */
 const METERS=[3,4,5];
-/* Punkte: Karte = 3.000 × Kombo × Stufe × Rundenfaktor */
-const SC={card:3000,tower:60000,clear:200000,left:40000,sec:1500,full:30000,gold:40000,miss:6000};
-const TIER=s=>s>=20?3:s>=15?2:s>=10?1.5:1;
+/* Punkte: Karte = 4.000 × Kombo × Rundenfaktor */
+const SC={card:4000,tower:60000,clear:200000,left:40000,sec:1500,full:30000,gold:40000,miss:6000};
+const TIER=s=>1;
 const RF=r=>1+(r-1)*.25;
 const rfTxt=r=>'×'+RF(r).toLocaleString('de-DE');
 function roundPlan(code,r){const R=rng(hash(code+'#lay')),o=[1,2,3,4,5,6];for(let i=o.length-1;i>0;i--){const j=R()*(i+1)|0;[o[i],o[j]]=[o[j],o[i]]}
   const seq=[0,...o],o2=[0,1,2,3,4,5,6].filter(x=>x!==seq[6]);for(let i=o2.length-1;i>0;i--){const j=R()*(i+1)|0;[o2[i],o2[j]]=[o2[j],o2[i]]}
-  const lay=seq.concat(o2)[(r-1)%14];
+  const lay=0;
   const T=rng(hash(code+'#tw#'+r));let tw=r===1?0:1+((T()*4)|0);
   if(r>1){const T2=rng(hash(code+'#tw#'+(r-1)));const prev=r-1===1?0:1+((T2()*4)|0);if(prev===tw)tw=tw%4+1}
   return{lay,tw,name:LAYOUTS[lay][0],rows:LAYOUTS[lay][1],twist:TWISTS[tw]}}
@@ -496,13 +496,9 @@ function deck52(rand){const d=[];for(let s=0;s<4;s++)for(let r=1;r<=13;r++)d.pus
   for(let i=d.length-1;i>0;i--){const j=rand()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}return d}
 /* ---------- deal balancing: a bot plays each candidate shuffle; rounds get harder ---------- */
 const MR=(a,b)=>{const d=Math.abs(a-b);return d===1||d===12};
-/* Fairness-System
-   Jede Mischung wird vorab 24-mal von einem menschenähnlichen Computer-Spieler gespielt
-   (meist gute Züge, manchmal ein zufälliger). Daraus ergibt sich die Gewinnchance der Mischung.
-   Jede Runde bekommt eine Mischung mit genau der geplanten Chance: Runde 1 ≈ 90 %, dann gleichmäßig
-   5 % schwerer pro Runde bis Runde 10 ≈ 45 %. Jede Mischung ist mit bestem Spiel lösbar.
-   Geschenkte Karten sind ehrlich die nächste Karte eines eigenen Decks, ohne Eingriff.
-   Die Zeit richtet sich nach der Anzahl Züge, die die Mischung braucht. */
+/* Mischung: reiner Zufall. Einzige Bedingung: ein guter Spieler kann das Feld komplett räumen
+   (ein Computer-Spieler prüft das vorab). Geschenkte Karten sind ehrlich die nächste Karte eines eigenen Decks.
+   Die Zeit richtet sich nach der Anzahl Züge, die die Mischung braucht, und wird pro Runde knapper. */
 const TARGET=r=>0.90-(r-1)*0.05,TOL=0.06,RUNS=24;
 function simulate(deck,gifts,skill,rnd,open1){deck=deck.slice();gifts=gifts.slice();
   const f=[];LAY.forEach((cols,row)=>cols.forEach(col=>{const k=deck.pop();f.push({rank:k.rank,row,col,alive:true})}));
@@ -520,12 +516,10 @@ function simulate(deck,gifts,skill,rnd,open1){deck=deck.slice();gifts=gifts.slic
       if(f.every(c=>!c.alive))return{clear:true,left:stock.length,acts}}
     else{if(!stock.length)return{clear:false,left:0,acts};pile[0]=stock.pop().rank;acts++;meter=0;pile[1]=pile[2]=null}}}
 function chance(d,g,seed,o){const R=rng(seed);let m=0;for(let t=0;t<RUNS;t++)m+=simulate(d,g,.7,R,o).clear;return m/RUNS}
-function chooseDeal(code,r,o){let best=null,first=null;const T=TARGET(r);
-  for(let a=0;a<150;a++){const seed=hash(code+'#'+r+'#'+a),d=deck52(rng(seed)),g=deck52(rng(seed^0x9e3779b9));
-    const s=simulate(d,g,1,null,o);if(!first)first={d,g,acts:s.acts,p:.5};if(!s.clear)continue;
-    const p=chance(d,g,seed^0x51ed,o),c={d,g,acts:s.acts,p};if(Math.abs(p-T)<=TOL)return c;
-    if(!best||Math.abs(p-T)<Math.abs(best.p-T))best=c}
-  return best||first}
+function chooseDeal(code,r,o){let first=null;
+  for(let a=0;a<400;a++){const seed=hash(code+'#'+r+'#'+a),d=deck52(rng(seed)),g=deck52(rng(seed^0x9e3779b9));
+    const s=simulate(d,g,1,null,o);if(!first)first={d,g,acts:s.acts};if(s.clear)return{d,g,acts:s.acts}}
+  return first}
 const dealTime=(r,acts)=>Math.round((14+acts*(2.0-(r-1)*0.6/9))/5)*5;
 function newCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<5;i++)c+=A[Math.random()*A.length|0];return c}
 
@@ -570,7 +564,7 @@ function hud(){const Pl=G.players[G.turn]||{name:'',score:0};
 function float(txt,x,y,col){const d=document.createElement('div');d.className='float';d.textContent=txt;d.style.left=x+'px';d.style.top=y+'px';
   if(col)d.style.color=col;stage.appendChild(d);d.addEventListener('animationend',()=>d.remove())}
 function banner(txt,col,sub){const b=$('banner');b.innerHTML=esc(txt)+(sub?`<small>${esc(sub)}</small>`:'');b.style.color=col||'';b.classList.toggle('long',!!sub);b.classList.remove('show');void b.offsetWidth;b.classList.add('show')}
-function intro(){const t=PLAN.twist;banner(`Runde ${G.round} · ${PLAN.name}`,'#ffd36b',(t[1]?t[1]+': '+t[2]+' · ':'')+TIME+' s · Punkte '+rfTxt(G.round))}
+function intro(){const t=PLAN.twist;banner(`Runde ${G.round}`,'#ffd36b',(t[1]?t[1]+': '+t[2]+' · ':'')+TIME+' s · Punkte '+rfTxt(G.round))}
 function floatPts(txt,x,y,st){const d=document.createElement('div');d.className='float';d.textContent=txt;d.style.left=x+'px';d.style.top=y+'px';
   d.style.fontSize=Math.round(26+Math.min(st,25)*1.3)+'px';const t=TIER(st);if(t>1)d.style.color=t>=3?'#ff9a5a':t>=2?'#ffc061':'#ffe08a';
   stage.appendChild(d);d.addEventListener('animationend',()=>d.remove())}
@@ -637,8 +631,8 @@ function newBoard(){
     order.forEach((idx,j)=>setTimeout(()=>{const e=pack[idx];e.style.zIndex=100+j;e.style.transform=`translate(${MX+(idx<N/2?-P.cw*.24:P.cw*.24)}px,${MY-j*1.1}px) rotate(${idx<N/2?-5:5}deg)`},j*38))};
   const bridge=()=>{sBridge(0);pack.forEach((e,i)=>{e.style.transform=`translate(${MX}px,${MY-12-Math.sin(i/N*Math.PI)*16}px) rotate(0deg)`});
     setTimeout(()=>{pack.forEach((e,i)=>{e.style.transform=`translate(${MX}px,${MY-i*1.1}px)`});sTap(0,.55)},330)};
-  [[split,80],[riffle,380],[bridge,1050],[split,1550],[riffle,1850],[bridge,2520]].forEach(([f,t])=>setTimeout(f,t));
-  setTimeout(()=>{pack.forEach(e=>e.remove());deal(deck)},3050);
+  [[split,60],[riffle,330],[bridge,960]].forEach(([f,t])=>setTimeout(f,t));
+  setTimeout(()=>{pack.forEach(e=>e.remove());deal(deck)},1450);
 }
 function deal(deck){
   let n=0;
@@ -712,7 +706,7 @@ function score(x,y,c){
   floatPts('+'+fmt(pts)+(dbl>1?' ×2':''),x,y,streak);
   const MS={5:'Stark!',10:'Super!',15:'Fantastisch!',20:'Magisch!',25:'Unglaublich!',30:'Legendär!'};
   if(MS[streak]){const bon=Math.round(streak*4000*RF(G.round));boardScore+=bon;
-    banner(MS[streak]+(streak===10?' Punkte ×1,5':streak===15?' Punkte ×2':streak===20?' Punkte ×3':' ×'+streak),'#ffd36b');setTimeout(()=>float('+'+fmt(bon)+' Kombo-Bonus',x,y-50,'#ffe08a'),200);sChime();
+    banner(MS[streak]+' ×'+streak,'#ffd36b');setTimeout(()=>float('+'+fmt(bon)+' Kombo-Bonus',x,y-50,'#ffe08a'),200);sChime();
     if(streak>=10){const f=$('flask');burst(P.flaskX+P.FW/2,P.RY+P.ch*.6,10+streak,streak>=20?FIRE:GOLD,5,.14)}
     if(streak===10){unlock('c10');mev('combo10')}if(streak===15)mev('combo15');if(streak===20)unlock('c20');
 }
@@ -768,9 +762,9 @@ function endBoard(why){
     showResult(res)};
   if(clear)finale(res).then(done);else{banner(why==='time'?'Zeit abgelaufen':'Keine Züge mehr','#ffb3b3');tone(262,.5,'sine',.07);wait(1100).then(done)}}
 async function finale(res){
-  banner('Alle Türme gefallen!','#ffd36b');sChime();await wait(950);
-  boardScore+=res.cb;hud();float('+'+fmt(res.cb)+' Feld geräumt',P.W/2,P.top0+P.ch*.8,'#ffe08a');tone(784,.4,'sine',.08);await wait(650);
-  if(res.fb){boardScore+=res.fb;hud();float('+'+fmt(res.fb)+' Fehlerfrei',P.W/2,P.top0+P.ch*1.3,'#bff5c9');tone(988,.4,'sine',.08);await wait(650)}
+  banner('Alle Türme gefallen!','#ffd36b');sChime();await wait(650);
+  boardScore+=res.cb;hud();float('+'+fmt(res.cb)+' Feld geräumt',P.W/2,P.top0+P.ch*.8,'#ffe08a');tone(784,.4,'sine',.08);await wait(420);
+  if(res.fb){boardScore+=res.fb;hud();float('+'+fmt(res.fb)+' Fehlerfrei',P.W/2,P.top0+P.ch*1.3,'#bff5c9');tone(988,.4,'sine',.08);await wait(420)}
   const n=stock.length,gap=n?Math.max(80,Math.min(200,2400/n)):0;
   if(n){banner(n+(n>1?' Karten übrig!':' Karte übrig!'),'#ffd36b');await wait(500)}
   for(let i=0;i<n;i++){const k=stock.pop();boardScore+=res.per;hud();
@@ -800,7 +794,7 @@ function showResult(res){
    ${res.xp?`<div class="xprow">${lvlBar()}<span class="gain">+${res.xp} XP${PR.streak>1?` <small>(${PR.streak} Tage in Folge)</small>`:''}</span></div>${PR.lvl>res.lvlBefore?`<p class="near" style="color:#1f7a45">Stufe ${PR.lvl} erreicht!${BACKS.concat(FELTS).some(x=>x[x.length-1]===PR.lvl)?' Neues in der Sammlung freigeschaltet.':''}</p>`:''}`:''}
    ${!res.clear&&res.left<=3?`<p class="near">So knapp! Nur ${res.left} Karte${res.left===1?'':'n'} fehlte${res.left===1?'':'n'}.</p>`:''}
    <button class="btn big" id="go">${last?'Endstand':G.players.length>1?esc(nextName)+' ist dran':'Nächste Runde'}</button>
-   ${!last?(()=>{const nx=roundPlan(G.code,nextTurn?G.round:G.round+1);return `<p class="note" style="margin-top:14px">Nächste Runde: <b>${esc(nx.name)}</b>${nx.twist[1]?' · '+esc(nx.twist[1]):''} · Punkte ${rfTxt(nextTurn?G.round:G.round+1)}</p>`})():''}</div>`;
+   ${!last?(()=>{const nx=roundPlan(G.code,nextTurn?G.round:G.round+1);return `<p class="note" style="margin-top:14px">Nächste Runde: ${nx.twist[1]?'<b>'+esc(nx.twist[1])+'</b> · ':''}weniger Zeit · Punkte ${rfTxt(nextTurn?G.round:G.round+1)}</p>`})():''}</div>`;
   ov.hidden=false;
   (async()=>{skip=false;const sk=()=>{skip=true};ov.addEventListener('pointerdown',sk);
     for(let i=0;i<rows.length;i++)await countUp(ov.querySelector(`b[data-i="${i}"]`),0,rows[i][1],rows[i][1]?380:0);
