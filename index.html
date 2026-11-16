@@ -350,7 +350,7 @@ try{const m=/[#&]m=([^&]+)/.exec(location.hash);if(m){const o=JSON.parse(decodeU
 /* Selbst-Update: holt beim Start die neueste Version, falls das iPhone noch eine alte zwischengespeichert hat */
 const VER='v18';
 if(/^https/.test(location.protocol))fetch(location.pathname+'?u='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const m=/const VER='([^']+)'/.exec(t);
-  if(m&&m[1]!==VER&&!sessionStorage.getItem('zt_up'+m[1])){sessionStorage.setItem('zt_up'+m[1],'1');location.replace(location.pathname+'?u='+Date.now()+location.hash)}}).catch(()=>{});
+  if(m&&m[1]!==VER&&!sessionStorage.getItem('zt_up'+m[1])){sessionStorage.setItem('zt_up'+m[1],'1');location.replace(location.pathname+(location.search?location.search+'&':'?')+'u='+Date.now()+location.hash)}}).catch(()=>{});
 const RN=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 /* Aufbauten: jede Runde ein anderes Feld (Reihe 0 = Turmspitzen, jede Reihe deckt die darüber halb ab) */
 const rr=(a,b)=>{const o=[];for(let x=a;x<=b+1e-9;x++)o.push(x);return o};
